@@ -158,11 +158,11 @@ export default function ProjectDetail() {
           >
             <ChevronLeft size={24} />
           </Button>
-          <h1 className="text-lg font-bold text-ink flex-1">项目明细</h1>
+          <div className="flex-1" />
         </div>
 
         <PullRefresh onRefresh={handleRefresh}>
-          <div className="px-4 pb-20">
+          <div className="px-4 pt-4 pb-20">
             {loading && !refreshing ? (
               <div className="space-y-3 mt-2">
                 {[1, 2, 3].map((i) => (

@@ -53,12 +53,8 @@ export default function Home() {
   return (
     <Layout>
       <div className="h-screen flex flex-col">
-        <div className="px-4 pt-6">
-          <h1 className="text-xl font-bold text-ink mb-4">首页</h1>
-        </div>
-
         <PullRefresh onRefresh={handleRefresh}>
-          <div className="px-4 pb-20">
+          <div className="px-4 pt-6 pb-20">
             {/* 年度消费统计卡片 */}
             <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-dark border-0 text-white shadow-lg shadow-primary/20 mb-6">
               <div className="p-5">

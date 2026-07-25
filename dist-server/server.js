@@ -214,7 +214,7 @@ return fn.apply(this, arguments)
     JOIN projects p ON i.project_id = p.id
     LEFT JOIN categories c ON i.category_id = c.id
     WHERE p.user_id = ? AND i.purchased = 0
-    ORDER BY i.created_at DESC
+    ORDER BY i.created_at ASC
   `).all(a.userId);e.json({success:!0,data:i})});var Hg=Gr;var XS=GS(import.meta.url),VS=Xr.dirname(XS);Df();var ae=(0,Ni.default)();ae.use((0,Gg.default)());ae.use(Ni.default.json({limit:"10mb"}));ae.use(Ni.default.urlencoded({extended:!0,limit:"10mb"}));ae.use("/api/auth",Og);ae.use("/api/projects",Ig);ae.use("/api/items",Ng);ae.use("/api/categories",Pg);ae.use("/api/platforms",Dg);ae.use("/api/prices",Bg);ae.use("/api/stats",Hg);ae.use("/api/health",(a,e)=>{e.status(200).json({success:!0,message:"ok"})});{let a=Xr.join(VS,"dist");ae.use(Ni.default.static(a)),ae.get("/{*splat}",(e,i)=>{i.sendFile(Xr.join(a,"index.html"))})}ae.use((a,e,i,n)=>{console.error("Server error:",a),i.status(500).json({success:!1,error:"\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF"})});ae.use("/api",(a,e)=>{e.status(404).json({success:!1,error:"API not found"})});var Vr=ae;var Xg=Number(process.env.PORT)||80,Vg=Vr.listen(Xg,()=>{console.log(`Server ready on port ${Xg}`)});process.on("SIGTERM",()=>{console.log("SIGTERM signal received"),Vg.close(()=>{console.log("Server closed"),process.exit(0)})});process.on("SIGINT",()=>{console.log("SIGINT signal received"),Vg.close(()=>{console.log("Server closed"),process.exit(0)})});var HI=Vr;export{HI as default};
 /*! Bundled license information:
 

@@ -52,7 +52,7 @@ router.get('/pending', authMiddleware, async (req: AuthRequest, res: Response): 
     JOIN projects p ON i.project_id = p.id
     LEFT JOIN categories c ON i.category_id = c.id
     WHERE p.user_id = ? AND i.purchased = 0
-    ORDER BY i.created_at DESC
+    ORDER BY i.created_at ASC
   `).all(req.userId) as unknown as PendingItem[];
 
   res.json({ success: true, data: items });

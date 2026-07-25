@@ -141,17 +141,13 @@ export default function List() {
   return (
     <Layout>
       <div className="h-screen flex flex-col">
-        <div className="px-4 pt-6 pb-2">
-          <h1 className="text-xl font-bold text-ink">清单</h1>
-        </div>
-
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto"
           onScroll={handleScroll}
         >
           <PullRefresh onRefresh={handleRefresh}>
-            <div className="px-4 pb-20">
+            <div className="px-4 pt-6 pb-20">
               {loading && !refreshing ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
