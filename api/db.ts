@@ -8,8 +8,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 数据库文件放在运行脚本的相同目录下
-const dbPath = path.join(process.cwd(), 'data.db');
+// 数据库文件放在 server.js/ts 脚本的相同目录下
+// 开发环境：api/ 目录
+// 生产环境：dist-server/ 目录（与 server.js 同级）
+const dbPath = path.join(__dirname, 'data.db');
 
 export const db = new DatabaseSync(dbPath);
 
