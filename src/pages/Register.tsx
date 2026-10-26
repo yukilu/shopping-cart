@@ -2,7 +2,7 @@
  * 注册页面
  */
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Button, Input } from '@nutui/nutui-react';
@@ -111,9 +111,9 @@ export default function Register() {
 
       <p className="text-center text-sm text-gray-500 mt-6">
         已有账号？{' '}
-        <Link to="/login" className="text-primary font-medium">
+        <button type="button" onClick={() => navigate(-1)} className="text-primary font-medium">
           返回登录
-        </Link>
+        </button>
       </p>
     </div>
   );

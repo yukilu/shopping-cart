@@ -3,7 +3,7 @@
  */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, ShoppingBag, ChevronRight } from 'lucide-react';
+import { TrendingUp, ShoppingBag, ChevronRight, Star } from 'lucide-react';
 import Layout from '@/components/Layout';
 import PullRefresh from '@/components/PullRefresh';
 import { api } from '@/lib/api';
@@ -117,15 +117,19 @@ export default function Home() {
             ) : (
               <div className="space-y-2">
                 {pending.map((item) => (
-                  <div
+                  <button
                     key={item.id}
-                    className="rounded-xl border-gray-50 bg-white cursor-pointer active:bg-gray-50 transition-colors"
-                    onClick={() => navigate(`/project/${item.project_id}`)}
+                    type="button"
+                    aria-label={`查看物品：${item.name}`}
+                    className="w-full rounded-xl border border-gray-100 bg-white text-left transition-all hover:border-gray-200 hover:shadow-sm active:scale-[0.99] active:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                    onClick={() => navigate(`/item/${item.id}`)}
                   >
                     <div className="flex items-center gap-3 p-3">
-                      <div className="w-1 h-10 rounded-full bg-warning" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-ink truncate">{item.name}</p>
+                        <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                          {item.must_buy && <Star size={13} fill="currentColor" className="shrink-0 text-amber-500" />}
+                          <span className="truncate">{item.name}</span>
+                        </p>
                         <p className="text-xs text-gray-400 truncate">
                           {item.project_name}
                           {item.category_name && ` · ${item.category_name}`}
@@ -133,7 +137,7 @@ export default function Home() {
                       </div>
                       <ChevronRight size={16} className="text-gray-300" />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

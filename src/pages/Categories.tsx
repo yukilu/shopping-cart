@@ -8,7 +8,7 @@ import { Button, Input } from '@nutui/nutui-react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import SortableList, { GripVertical } from '@/components/SortableList';
+import ReorderableList from '@/components/ReorderableList';
 import { api } from '@/lib/api';
 import type { Category } from '@shared/types';
 
@@ -103,7 +103,7 @@ export default function Categories() {
         <Button
           fill="none"
           size="small"
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate(-1)}
           className="p-1 -ml-1 text-gray-500 h-8 w-8"
         >
           <ChevronLeft size={24} />
@@ -134,16 +134,14 @@ export default function Categories() {
             <p className="text-xs text-gray-400">点击右上角添加分类</p>
           </div>
         ) : (
-          <SortableList
+          <ReorderableList
             items={categories}
             onReorder={handleReorder}
             getKey={(cat) => cat.id}
-            renderItem={(cat, dragHandleProps) => (
+            getLabel={(cat) => cat.name}
+            renderItem={(cat) => (
               <div className="rounded-xl border-gray-50">
                 <div className="flex items-center gap-3 p-3">
-                  <div {...dragHandleProps} className="text-gray-300 flex-shrink-0">
-                    <GripVertical size={18} />
-                  </div>
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Tag size={14} className="text-primary" />
                   </div>

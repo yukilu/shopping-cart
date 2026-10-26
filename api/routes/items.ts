@@ -61,6 +61,7 @@ router.get('/project/:projectId', authMiddleware, async (req: AuthRequest, res: 
     return {
       ...item,
       purchased: Boolean(item.purchased),
+      must_buy: Boolean(item.must_buy),
       category: item.category_name ? { id: item.category_id, name: item.category_name } : null,
       platform: item.platform_name ? { id: item.platform_id, name: item.platform_name } : null,
       prices,
@@ -68,6 +69,48 @@ router.get('/project/:projectId', authMiddleware, async (req: AuthRequest, res: 
   });
 
   res.json({ success: true, data: result });
+});
+
+/**
+ * GET /api/items/:id
+ */
+router.get('/items/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const item = db.prepare(`
+    SELECT i.*, c.name AS category_name, p.name AS platform_name
+    FROM items i
+    JOIN projects project ON project.id = i.project_id
+    LEFT JOIN categories c ON c.id = i.category_id
+    LEFT JOIN platforms p ON p.id = i.platform_id
+    WHERE i.id = ? AND project.user_id = ?
+  `).get(Number(req.params.id), req.userId) as unknown as (Item & {
+    category_name: string | null;
+    platform_name: string | null;
+  }) | undefined;
+
+  if (!item) {
+    res.status(404).json({ success: false, error: '物品不存在' });
+    return;
+  }
+
+  const prices = db.prepare(`
+    SELECT price_records.*, platforms.name AS platform_name
+    FROM price_records
+    LEFT JOIN platforms ON platforms.id = price_records.platform_id
+    WHERE price_records.item_id = ?
+    ORDER BY date DESC
+  `).all(item.id) as unknown as PriceRecord[];
+
+  res.json({
+    success: true,
+    data: {
+      ...item,
+      purchased: Boolean(item.purchased),
+      must_buy: Boolean(item.must_buy),
+      category: item.category_name ? { id: item.category_id, name: item.category_name } : null,
+      platform: item.platform_name ? { id: item.platform_id, name: item.platform_name } : null,
+      prices,
+    },
+  });
 });
 
 /**
@@ -87,13 +130,14 @@ router.post('/project/:projectId', authMiddleware, async (req: AuthRequest, res:
   }
 
   const result = db.prepare(`
-    INSERT INTO items (project_id, category_id, name, purchased, price, platform_id, shop, remark)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO items (project_id, category_id, name, purchased, must_buy, price, platform_id, shop, remark)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     projectId,
     input.category_id || null,
     input.name.trim(),
     input.purchased ? 1 : 0,
+    input.must_buy ? 1 : 0,
     input.purchased ? (input.price || null) : null,
     input.platform_id || null,
     input.shop || null,
@@ -103,7 +147,7 @@ router.post('/project/:projectId', authMiddleware, async (req: AuthRequest, res:
   const item = db.prepare('SELECT * FROM items WHERE id = ?').get(result.lastInsertRowid) as unknown as Item;
   res.json({
     success: true,
-    data: { ...item, purchased: Boolean(item.purchased), prices: [] },
+    data: { ...item, purchased: Boolean(item.purchased), must_buy: Boolean(item.must_buy), prices: [] },
   });
 });
 
@@ -139,6 +183,85 @@ router.put('/reorder', authMiddleware, async (req: AuthRequest, res: Response): 
 });
 
 /**
+ * PUT /api/items/:id/move
+ */
+router.put('/items/:id/move', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const itemId = Number(req.params.id);
+  const item = verifyItem(itemId, req.userId!);
+  if (!item) {
+    res.status(404).json({ success: false, error: '物品不存在' });
+    return;
+  }
+  if (item.purchased) {
+    res.status(400).json({ success: false, error: '已购买的物品不能更换清单' });
+    return;
+  }
+
+  const projectId = Number(req.body.projectId);
+  if (!Number.isInteger(projectId) || !verifyProject(projectId, req.userId!)) {
+    res.status(404).json({ success: false, error: '目标清单不存在' });
+    return;
+  }
+
+  const nextSortOrder = db.prepare(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM items WHERE project_id = ?',
+  ).get(projectId) as { next: number };
+
+  db.prepare('UPDATE items SET project_id = ?, sort_order = ? WHERE id = ?')
+    .run(projectId, nextSortOrder.next, itemId);
+
+  res.json({ success: true, data: { success: true } });
+});
+
+/**
+ * PUT /api/items/:id/purchase
+ */
+router.put('/items/:id/purchase', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const itemId = Number(req.params.id);
+  const item = verifyItem(itemId, req.userId!);
+  if (!item) {
+    res.status(404).json({ success: false, error: '物品不存在' });
+    return;
+  }
+
+  const price = Number(req.body.price);
+  const platformId = req.body.platform_id ? Number(req.body.platform_id) : null;
+  const shop = typeof req.body.shop === 'string' ? req.body.shop.trim() : '';
+  if (!Number.isFinite(price) || price <= 0) {
+    res.status(400).json({ success: false, error: '请输入有效的购买价格' });
+    return;
+  }
+  if (platformId !== null) {
+    const platform = db.prepare('SELECT id FROM platforms WHERE id = ? AND user_id = ?')
+      .get(platformId, req.userId);
+    if (!platform) {
+      res.status(400).json({ success: false, error: '购买平台无效' });
+      return;
+    }
+  }
+
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE items SET purchased = 1, price = ?, platform_id = ?, shop = ? WHERE id = ?')
+      .run(price, platformId, shop || null, itemId);
+    if (!item.purchased) {
+      db.prepare(`
+        INSERT INTO price_records (item_id, price, date, platform_id, remark)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(itemId, price, new Date().toISOString().split('T')[0], platformId, '购买价');
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    console.error('保存购买信息失败', err);
+    res.status(500).json({ success: false, error: '保存购买信息失败' });
+    return;
+  }
+
+  res.json({ success: true, data: { success: true } });
+});
+
+/**
  * PUT /api/items/:id
  */
 router.put('/items/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -157,12 +280,13 @@ router.put('/items/:id', authMiddleware, async (req: AuthRequest, res: Response)
 
   db.prepare(`
     UPDATE items SET
-      category_id = ?, name = ?, purchased = ?, price = ?, platform_id = ?, shop = ?, remark = ?
+      category_id = ?, name = ?, purchased = ?, must_buy = ?, price = ?, platform_id = ?, shop = ?, remark = ?
     WHERE id = ?
   `).run(
     input.category_id || null,
     input.name.trim(),
     input.purchased ? 1 : 0,
+    input.must_buy ? 1 : 0,
     input.purchased ? (input.price || null) : null,
     input.platform_id || null,
     input.shop || null,
@@ -173,7 +297,7 @@ router.put('/items/:id', authMiddleware, async (req: AuthRequest, res: Response)
   const item = db.prepare('SELECT * FROM items WHERE id = ?').get(itemId) as unknown as Item;
   res.json({
     success: true,
-    data: { ...item, purchased: Boolean(item.purchased) },
+    data: { ...item, purchased: Boolean(item.purchased), must_buy: Boolean(item.must_buy) },
   });
 });
 

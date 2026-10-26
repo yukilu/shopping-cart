@@ -50,6 +50,7 @@ export interface Item {
   platform_id: number | null;
   name: string;
   purchased: boolean;
+  must_buy: boolean;
   price: number | null;
   shop: string | null;
   remark: string | null;
@@ -64,6 +65,7 @@ export interface ItemInput {
   category_id?: number | null;
   name: string;
   purchased: boolean;
+  must_buy?: boolean;
   price?: number | null;
   platform_id?: number | null;
   shop?: string | null;
@@ -84,6 +86,7 @@ export interface PendingItem {
   project_name: string;
   category_name: string | null;
   remark: string | null;
+  must_buy: boolean;
   created_at: string;
 }
 

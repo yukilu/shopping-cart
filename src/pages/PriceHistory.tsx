@@ -142,6 +142,7 @@ export default function PriceHistory() {
         {/* 顶部导航 */}
         <div className="sticky top-0 bg-surface z-30 px-4 pt-4 pb-2 flex items-center gap-3">
           <button
+            aria-label="返回"
             onClick={() => navigate(-1)}
             className="p-1 -ml-1 text-gray-500"
           >

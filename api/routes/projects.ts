@@ -49,6 +49,28 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 });
 
 /**
+ * GET /api/projects/:id
+ */
+router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const project = db.prepare(`
+    SELECT p.*,
+      COUNT(i.id) AS item_count,
+      COALESCE(SUM(CASE WHEN i.purchased = 1 AND i.price IS NOT NULL THEN i.price ELSE 0 END), 0) AS total_spent
+    FROM projects p
+    LEFT JOIN items i ON i.project_id = p.id
+    WHERE p.id = ? AND p.user_id = ?
+    GROUP BY p.id
+  `).get(Number(req.params.id), req.userId) as unknown as Project | undefined;
+
+  if (!project) {
+    res.status(404).json({ success: false, error: '项目不存在' });
+    return;
+  }
+
+  res.json({ success: true, data: project });
+});
+
+/**
  * POST /api/projects
  */
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {

@@ -1,36 +1,36 @@
 /**
- * 项目明细页：物品列表、添加/编辑物品
+ * 项目物品列表页
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, ChevronLeft, TrendingUp, Trash2, Package, ChevronRight } from 'lucide-react';
-import { Button, Input, TextArea, Switch } from '@nutui/nutui-react';
+import { Plus, ChevronLeft, Package, Check, Circle, Star } from 'lucide-react';
+import { Button, Input, TextArea } from '@nutui/nutui-react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import Picker from '@/components/Picker';
-import SortableList, { GripVertical } from '@/components/SortableList';
+import ReorderableList from '@/components/ReorderableList';
 import PullRefresh from '@/components/PullRefresh';
+import PurchaseDetailsDialog, { type PurchaseDetails } from '@/components/PurchaseDetailsDialog';
 import { api } from '@/lib/api';
-import type { Item, ItemInput, Category, Platform } from '@shared/types';
+import type { Item, ItemInput, Category, Platform, Project } from '@shared/types';
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const projectId = Number(id);
   const navigate = useNavigate();
 
+  const [project, setProject] = useState<Project | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 添加/编辑物品
+  // 添加物品
   const [formOpen, setFormOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form, setForm] = useState<ItemInput>({
     name: '',
     purchased: false,
+    must_buy: false,
     price: null,
     platform_id: null,
     shop: '',
@@ -38,13 +38,9 @@ export default function ProjectDetail() {
     category_id: null,
   });
   const [submitting, setSubmitting] = useState(false);
-
-  // 删除物品
-  const [deleteTarget, setDeleteTarget] = useState<Item | null>(null);
-
-  // Picker 状态
-  const [catPickerOpen, setCatPickerOpen] = useState(false);
-  const [platformPickerOpen, setPlatformPickerOpen] = useState(false);
+  const [purchaseTarget, setPurchaseTarget] = useState<Item | null>(null);
+  const [purchaseError, setPurchaseError] = useState('');
+  const [purchaseForm, setPurchaseForm] = useState<PurchaseDetails>({ price: '', platform_id: null, shop: '' });
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) {
@@ -54,11 +50,13 @@ export default function ProjectDetail() {
       setRefreshing(true);
     }
     try {
-      const [itemsData, catsData, platformsData] = await Promise.all([
+      const [projectData, itemsData, catsData, platformsData] = await Promise.all([
+        api.getProject(projectId),
         api.getItems(projectId),
         api.getCategories(),
         api.getPlatforms(),
       ]);
+      setProject(projectData);
       setItems(itemsData);
       setCategories(catsData);
       setPlatforms(platformsData);
@@ -87,11 +85,57 @@ export default function ProjectDetail() {
     }
   };
 
+  const toggleMustBuy = async (item: Item) => {
+    const must_buy = !item.must_buy;
+    setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, must_buy } : entry));
+    try {
+      await api.updateItem(item.id, {
+        name: item.name,
+        purchased: item.purchased,
+        must_buy,
+        price: item.price,
+        platform_id: item.platform_id,
+        shop: item.shop || '',
+        remark: item.remark || '',
+        category_id: item.category_id,
+      });
+    } catch (err) {
+      console.error('更新必购状态失败', err);
+      await loadData(true);
+    }
+  };
+
+  const handleConfirmPurchase = async () => {
+    if (!purchaseTarget) return;
+    const price = Number(purchaseForm.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      setPurchaseError('请输入有效的购买价格');
+      return;
+    }
+
+    setSubmitting(true);
+    setPurchaseError('');
+    try {
+      await api.completeItemPurchase(purchaseTarget.id, {
+        price,
+        platform_id: purchaseForm.platform_id,
+        shop: purchaseForm.shop,
+      });
+      setPurchaseTarget(null);
+      await loadData(true);
+    } catch (err) {
+      console.error('保存购买信息失败', err);
+      setPurchaseError(err instanceof Error ? err.message : '保存失败，请重试');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const openAddForm = () => {
-    setEditingItem(null);
     setForm({
       name: '',
       purchased: false,
+      must_buy: false,
       price: null,
       platform_id: null,
       shop: '',
@@ -101,47 +145,17 @@ export default function ProjectDetail() {
     setFormOpen(true);
   };
 
-  const openEditForm = (item: Item) => {
-    setEditingItem(item);
-    setForm({
-      name: item.name,
-      purchased: item.purchased,
-      price: item.price,
-      platform_id: item.platform_id,
-      shop: item.shop || '',
-      remark: item.remark || '',
-      category_id: item.category_id,
-    });
-    setFormOpen(true);
-  };
-
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
     setSubmitting(true);
     try {
-      if (editingItem) {
-        const updated = await api.updateItem(editingItem.id, form);
-        setItems((prev) => prev.map((it) => (it.id === updated.id ? { ...it, ...updated } : it)));
-      } else {
-        const newItem = await api.createItem(projectId, form);
-        setItems((prev) => [newItem, ...prev]);
-      }
+      const newItem = await api.createItem(projectId, form);
+      setItems((prev) => [newItem, ...prev]);
       setFormOpen(false);
     } catch (err) {
       console.error('保存物品失败', err);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await api.deleteItem(deleteTarget.id);
-      setItems((prev) => prev.filter((it) => it.id !== deleteTarget.id));
-      setDeleteTarget(null);
-    } catch (err) {
-      console.error('删除物品失败', err);
     }
   };
 
@@ -153,12 +167,14 @@ export default function ProjectDetail() {
           <Button
             fill="none"
             size="small"
-            onClick={() => navigate('/list')}
+            onClick={() => navigate(-1)}
             className="p-1 -ml-1 text-gray-500 h-8 w-8"
           >
             <ChevronLeft size={24} />
           </Button>
-          <div className="flex-1" />
+          <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-ink">
+            {project?.name || '物品清单'}
+          </h1>
         </div>
 
         <PullRefresh onRefresh={handleRefresh}>
@@ -178,24 +194,18 @@ export default function ProjectDetail() {
                 <p className="text-xs text-gray-400">点击右下角加号添加物品</p>
               </div>
             ) : (
-              <SortableList
+              <ReorderableList
                 items={items}
                 onReorder={handleReorder}
                 getKey={(item) => item.id}
-                renderItem={(item, dragHandleProps) => (
+                getLabel={(item) => item.name}
+                renderItem={(item) => (
                   <div
-                    className="rounded-xl border-gray-50 bg-white"
-                    onClick={() => openEditForm(item)}
+                    className="cursor-pointer rounded-xl border-gray-50 bg-white"
+                    onClick={() => navigate(`/item/${item.id}`)}
                   >
                     <div className="p-4 active:bg-gray-50 transition-colors cursor-pointer">
                       <div className="flex items-start justify-between gap-3">
-                        <div
-                          {...dragHandleProps}
-                          onClick={(e) => e.stopPropagation()}
-                          className="cursor-grab active:cursor-grabbing touch-none text-gray-300 flex-shrink-0 pt-1"
-                        >
-                          <GripVertical size={18} />
-                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="text-base font-medium text-ink">
@@ -206,39 +216,53 @@ export default function ProjectDetail() {
                                 {item.category.name}
                               </span>
                             )}
+                            <button
+                              type="button"
+                              aria-pressed={item.must_buy}
+                              aria-label={item.must_buy ? '取消必购' : '标记为必购'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void toggleMustBuy(item);
+                              }}
+                              className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+                                item.must_buy
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'text-gray-300 hover:bg-amber-50 hover:text-amber-700'
+                              }`}
+                            >
+                              <Star size={16} fill={item.must_buy ? 'currentColor' : 'none'} />
+                            </button>
                           </div>
                           {item.purchased && (
                             <div className="flex items-center gap-2 text-xs text-gray-400">
-                              <span className="font-bold text-primary text-sm">
-                                ¥{Number(item.price).toFixed(2)}
-                              </span>
+                              {item.price !== null && (
+                                <span className="font-bold text-primary text-sm">
+                                  ¥{Number(item.price).toFixed(2)}
+                                </span>
+                              )}
                               {item.platform?.name && <span>{item.platform.name}</span>}
                               {item.shop && <span>· {item.shop}</span>}
                             </div>
                           )}
                         </div>
-                        <div
-                          className="flex items-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Switch
-                            checked={item.purchased}
-                            onChange={(checked) => {
-                              setItems((prev) =>
-                                prev.map((it) =>
-                                  it.id === item.id
-                                    ? { ...it, purchased: checked, price: checked ? (it.price || 0) : null }
-                                    : it
-                                )
-                              );
-                              api.updateItem(item.id, {
-                                ...item,
-                                purchased: checked,
-                                price: checked ? (item.price || 0) : null,
-                              });
+                        {item.purchased ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <Check size={14} />已购
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setPurchaseForm({ price: '', platform_id: item.platform_id, shop: item.shop || '' });
+                              setPurchaseError('');
+                              setPurchaseTarget(item);
                             }}
-                          />
-                        </div>
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-200"
+                          >
+                            <Circle size={14} />待购
+                          </button>
+                        )}
                       </div>
 
                       {item.remark && (
@@ -247,41 +271,6 @@ export default function ProjectDetail() {
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-50">
-                        {/* 价格范围 */}
-                        {(() => {
-                          const prices = item.prices || [];
-                          if (prices.length === 0) return null;
-                          const minPrice = Math.min(...prices.map(p => p.price));
-                          const maxPrice = Math.max(...prices.map(p => p.price));
-                          return (
-                            <span className="text-xs text-gray-400">
-                              ¥{minPrice.toFixed(2)} ~ ¥{maxPrice.toFixed(2)}
-                            </span>
-                          );
-                        })()}
-                        {/* 操作图标 */}
-                        <div className="flex items-center gap-4 ml-auto">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/price-history/${item.id}?name=${encodeURIComponent(item.name)}`);
-                            }}
-                            className="text-gray-400 p-1 active:text-primary"
-                          >
-                            <TrendingUp size={18} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget(item);
-                            }}
-                            className="text-gray-400 p-1 active:text-red-500"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -304,7 +293,7 @@ export default function ProjectDetail() {
       {/* 添加/编辑物品弹窗 */}
       <Modal
         open={formOpen}
-        title={editingItem ? '编辑物品' : '添加物品'}
+        title="添加物品"
         onClose={() => setFormOpen(false)}
       >
         <div className="space-y-0">
@@ -321,26 +310,53 @@ export default function ProjectDetail() {
           </div>
 
           {/* 分类 */}
-          <div
-            className="flex items-center justify-between py-3 border-b border-gray-50 cursor-pointer active:bg-gray-50"
-            onClick={() => setCatPickerOpen(true)}
-          >
-            <label className="text-sm text-gray-500">分类</label>
-            <div className="flex items-center gap-1">
-              <span className="text-sm text-ink">
-                {form.category_id ? categories.find((c) => c.id === form.category_id)?.name || '未分类' : '未分类'}
-              </span>
-              <ChevronRight size={16} className="text-gray-300" />
+          <div className="border-b border-gray-50 py-3">
+            <span className="text-sm text-gray-500">分类（选填）</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {categories.map((category) => {
+                const selected = form.category_id === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setForm({ ...form, category_id: selected ? null : category.id })}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      selected ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-gray-200 bg-white text-gray-500'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* 已购 */}
-          <div className="flex items-center justify-between py-3 border-b border-gray-50">
-            <label className="text-sm text-gray-500">已购</label>
-            <Switch
-              checked={form.purchased}
-              onChange={(checked) => setForm({ ...form, purchased: checked })}
-            />
+          {/* 购买状态 */}
+          <div className="flex items-center justify-between gap-4 py-3 border-b border-gray-50">
+            <label className="text-sm text-gray-500">购买状态</label>
+            <div className="flex rounded-lg bg-gray-100 p-1" role="group" aria-label="购买状态">
+              <button
+                type="button"
+                aria-pressed={!form.purchased}
+                onClick={() => setForm({ ...form, purchased: false })}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  !form.purchased ? 'bg-white font-medium text-ink shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                待购
+              </button>
+              <button
+                type="button"
+                aria-pressed={form.purchased}
+                onClick={() => setForm({ ...form, purchased: true })}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  form.purchased ? 'bg-white font-medium text-ink shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                已购
+              </button>
+            </div>
           </div>
 
           {form.purchased && (
@@ -357,16 +373,25 @@ export default function ProjectDetail() {
                 />
               </div>
               {/* 购买平台 */}
-              <div
-                className="flex items-center justify-between py-3 border-b border-gray-50 cursor-pointer active:bg-gray-50"
-                onClick={() => setPlatformPickerOpen(true)}
-              >
-                <label className="text-sm text-gray-500">购买平台</label>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-ink">
-                    {form.platform_id ? platforms.find((p) => p.id === form.platform_id)?.name || '未选择' : '未选择'}
-                  </span>
-                  <ChevronRight size={16} className="text-gray-300" />
+              <div className="border-b border-gray-50 py-3">
+                <span className="text-sm text-gray-500">购买平台（选填）</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {platforms.map((platform) => {
+                    const selected = form.platform_id === platform.id;
+                    return (
+                      <button
+                        key={platform.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setForm({ ...form, platform_id: selected ? null : platform.id })}
+                        className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                          selected ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-gray-200 bg-white text-gray-500'
+                        }`}
+                      >
+                        {platform.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               {/* 购买店铺 */}
@@ -383,17 +408,29 @@ export default function ProjectDetail() {
             </>
           )}
 
-          {/* 备注 */}
-          <div className="flex items-start gap-3 py-3 border-b border-gray-50">
-            <label className="text-sm text-gray-500 w-20 shrink-0 pt-2">备注</label>
+          <div className="flex items-start gap-3 border-b border-gray-50 py-3">
+            <label className="w-20 shrink-0 pt-2 text-sm text-gray-500">备注</label>
             <TextArea
               value={form.remark || ''}
-              onChange={(val) => setForm({ ...form, remark: val })}
+              onChange={(value) => setForm({ ...form, remark: value })}
               placeholder="添加备注..."
               rows={2}
-              className="flex-1 rounded-lg border-gray-200 bg-white text-ink placeholder:text-gray-400 focus-visible:ring-primary/10 text-sm resize-none min-h-[60px]"
+              className="min-h-[60px] flex-1 resize-none rounded-lg border-gray-200 bg-white text-sm text-ink"
             />
           </div>
+
+          <button
+            type="button"
+            aria-pressed={!!form.must_buy}
+            onClick={() => setForm({ ...form, must_buy: !form.must_buy })}
+            className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition-colors ${
+              form.must_buy
+                ? 'border-amber-200 bg-amber-50 font-medium text-amber-700'
+                : 'border-gray-200 text-gray-500'
+            }`}
+          >
+            <Star size={16} fill={form.must_buy ? 'currentColor' : 'none'} />必购
+          </button>
 
           <Button
             fill="none"
@@ -406,35 +443,18 @@ export default function ProjectDetail() {
         </div>
       </Modal>
 
-      {/* 删除物品确认 */}
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="删除物品"
-        message={`确定删除"${deleteTarget?.name}"吗？`}
-        confirmText="删除"
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+      <PurchaseDetailsDialog
+        open={!!purchaseTarget}
+        itemName={purchaseTarget?.name || '物品'}
+        platforms={platforms}
+        value={purchaseForm}
+        error={purchaseError}
+        submitting={submitting}
+        onChange={setPurchaseForm}
+        onConfirm={handleConfirmPurchase}
+        onClose={() => setPurchaseTarget(null)}
       />
 
-      {/* 分类 Picker */}
-      <Picker
-        open={catPickerOpen}
-        title="选择分类"
-        options={[{ label: '未分类', value: '' }, ...categories.map((c) => ({ label: c.name, value: c.id }))]}
-        value={form.category_id || ''}
-        onChange={(v) => setForm({ ...form, category_id: v === '' ? null : Number(v) })}
-        onClose={() => setCatPickerOpen(false)}
-      />
-
-      {/* 平台 Picker */}
-      <Picker
-        open={platformPickerOpen}
-        title="选择平台"
-        options={[{ label: '未选择', value: '' }, ...platforms.map((p) => ({ label: p.name, value: p.id }))]}
-        value={form.platform_id || ''}
-        onChange={(v) => setForm({ ...form, platform_id: v === '' ? null : Number(v) })}
-        onClose={() => setPlatformPickerOpen(false)}
-      />
     </Layout>
   );
 }

@@ -74,6 +74,8 @@ export const api = {
   // 项目
   getProjects: (page: number = 1) =>
     request<PaginationResponse<Project[]>>(`/projects?page=${page}`),
+  getProject: (id: number) =>
+    request<Project>(`/projects/${id}`),
   createProject: (name: string, date?: string) =>
     request<Project>('/projects', {
       method: 'POST',
@@ -92,6 +94,8 @@ export const api = {
   // 物品
   getItems: (projectId: number) =>
     request<Item[]>(`/items/project/${projectId}`),
+  getItem: (id: number) =>
+    request<Item>(`/items/items/${id}`),
   createItem: (projectId: number, input: ItemInput) =>
     request<Item>(`/items/project/${projectId}`, {
       method: 'POST',
@@ -99,6 +103,16 @@ export const api = {
     }),
   updateItem: (id: number, input: ItemInput) =>
     request<Item>(`/items/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  moveItem: (id: number, projectId: number) =>
+    request<{ success: boolean }>(`/items/items/${id}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ projectId }),
+    }),
+  completeItemPurchase: (id: number, input: { price: number; platform_id: number | null; shop: string }) =>
+    request<{ success: boolean }>(`/items/items/${id}/purchase`, {
       method: 'PUT',
       body: JSON.stringify(input),
     }),

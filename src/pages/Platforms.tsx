@@ -8,7 +8,7 @@ import { Button, Input } from '@nutui/nutui-react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import SortableList, { GripVertical } from '@/components/SortableList';
+import ReorderableList from '@/components/ReorderableList';
 import { api } from '@/lib/api';
 import type { Platform } from '@shared/types';
 
@@ -103,7 +103,7 @@ export default function Platforms() {
         <Button
           fill="none"
           size="small"
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate(-1)}
           className="p-1 -ml-1 text-gray-500 h-8 w-8"
         >
           <ChevronLeft size={24} />
@@ -134,16 +134,14 @@ export default function Platforms() {
             <p className="text-xs text-gray-400">点击右上角添加购买平台</p>
           </div>
         ) : (
-          <SortableList
+          <ReorderableList
             items={platforms}
             onReorder={handleReorder}
             getKey={(p) => p.id}
-            renderItem={(p, dragHandleProps) => (
+            getLabel={(p) => p.name}
+            renderItem={(p) => (
               <div className="rounded-xl border-gray-50">
                 <div className="flex items-center gap-3 p-3">
-                  <div {...dragHandleProps} className="text-gray-300 flex-shrink-0">
-                    <GripVertical size={18} />
-                  </div>
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <ShoppingBag size={14} className="text-primary" />
                   </div>

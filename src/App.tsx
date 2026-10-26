@@ -6,6 +6,7 @@ import Register from '@/pages/Register';
 import Home from '@/pages/Home';
 import List from '@/pages/List';
 import ProjectDetail from '@/pages/ProjectDetail';
+import ItemDetail from '@/pages/ItemDetail';
 import PriceHistory from '@/pages/PriceHistory';
 import Profile from '@/pages/Profile';
 import Categories from '@/pages/Categories';
@@ -64,6 +65,9 @@ export default function App() {
         } />
         <Route path="/project/:id" element={
           <ProtectedRoute><ProjectDetail /></ProtectedRoute>
+        } />
+        <Route path="/item/:itemId" element={
+          <ProtectedRoute><ItemDetail /></ProtectedRoute>
         } />
         <Route path="/price-history/:itemId" element={
           <ProtectedRoute><PriceHistory /></ProtectedRoute>

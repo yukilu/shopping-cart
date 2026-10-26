@@ -67,6 +67,7 @@ export function initDatabase(): void {
       shop TEXT,
       remark TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      must_buy INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
@@ -98,6 +99,7 @@ export function initDatabase(): void {
   addColumnIfMissing('platforms', 'sort_order', "ALTER TABLE platforms ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing('projects', 'date', "ALTER TABLE projects ADD COLUMN date TEXT NOT NULL DEFAULT (date('now'))");
   addColumnIfMissing('items', 'sort_order', "ALTER TABLE items ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing('items', 'must_buy', "ALTER TABLE items ADD COLUMN must_buy INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing('items', 'platform_id', "ALTER TABLE items ADD COLUMN platform_id INTEGER");
   addColumnIfMissing('price_records', 'platform_id', "ALTER TABLE price_records ADD COLUMN platform_id INTEGER");
   addColumnIfMissing('price_records', 'remark', "ALTER TABLE price_records ADD COLUMN remark TEXT");

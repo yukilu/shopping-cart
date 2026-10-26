@@ -47,15 +47,17 @@ router.get('/year', authMiddleware, async (req: AuthRequest, res: Response): Pro
 router.get('/pending', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const items = db.prepare(`
     SELECT i.id, i.name, i.project_id, p.name as project_name,
-      c.name as category_name, i.remark, i.created_at
+      c.name as category_name, i.remark, i.must_buy, i.created_at
     FROM items i
     JOIN projects p ON i.project_id = p.id
     LEFT JOIN categories c ON i.category_id = c.id
     WHERE p.user_id = ? AND i.purchased = 0
-    ORDER BY i.created_at ASC
+    ORDER BY i.must_buy DESC, p.date DESC, p.created_at DESC, i.sort_order ASC, i.created_at DESC
   `).all(req.userId) as unknown as PendingItem[];
 
-  res.json({ success: true, data: items });
+  const normalizedItems = items.map((item) => ({ ...item, must_buy: Boolean(item.must_buy) }));
+
+  res.json({ success: true, data: normalizedItems });
 });
 
 export default router;

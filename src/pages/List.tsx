@@ -175,13 +175,7 @@ export default function List() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3
-                              className="text-base font-semibold text-ink truncate"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEdit(project);
-                              }}
-                            >
+                            <h3 className="text-base font-semibold text-ink truncate">
                               {project.name}
                             </h3>
                           </div>
