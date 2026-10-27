@@ -3,7 +3,7 @@
  */
 import app from './app.js';
 
-const PORT = process.env.NODE_ENV === 'production' ? (Number(process.env.PORT) || 80) : (Number(process.env.PORT) || 3000);
+const PORT = process.env.NODE_ENV === 'production' ? (Number(process.env.PORT) || 3002) : (Number(process.env.PORT) || 3000);
 
 const server = app.listen(PORT, () => {
   console.log(`Server ready on port ${PORT}`);
